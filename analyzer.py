@@ -9,22 +9,14 @@ from gensim.models.word2vec import LineSentence, Word2Vec
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn import manifold
 
-# from matplotlib.font_manager import FontProperties
-# font = FontProperties(fname=r"/usr/local/share/fonts/simhei.ttf", size=14)
-
-mpl.rcParams['font.sans-serif'] = ['AR PL UMing CN']  # 指定默认字体
-plt.rcParams['axes.unicode_minus'] = False  # 显示负号
-
-
 class Analyzer(object):
     """
     cut_result:分词结果
     authors: 作者列表
-    tfidf_word_vector: 用tf-idf为标准得到的词向量
-    w2v_word_vector: 用word2vector得到的词向量
+    tfidf_word_vector: 用tf-idf为标准得到的词汇向量
+    w2v_word_vector: 用word2vector得到的词汇向量
     w2v_model: 用word2vector得到的model
-    tfidf_word_vector_tsne: 降维后的词向量
-    w2v_word_vector_tsne: 降维后的词向量
+    tfidf_word_vector_tsne: 降维后的词汇向量
     """
 
     def __init__(self, cut_result, saved_dir):
@@ -38,12 +30,11 @@ class Analyzer(object):
         self.w2v_model, self.w2v_word_vector = self._word2vec(cut_result.author_poetry_dict)
         print("use t-sne for dimensionality reduction...")
         self.tfidf_word_vector_tsne = self._tsne(self.tfidf_word_vector)
-        self.w2v_word_vector_tsne = self._tsne(self.w2v_word_vector)
         print("result saved.")
 
     @staticmethod
     def _author_word_vector(author_poetry_dict):
-        """用tf-idf为标准解析每个作者的词向量"""
+        """用tf-idf为标准解析每个作者的词汇向量"""
         poetry = list(author_poetry_dict.values())
         vectorizer = CountVectorizer(min_df=15)
         word_matrix = vectorizer.fit_transform(poetry).toarray()
@@ -53,13 +44,13 @@ class Analyzer(object):
 
     @staticmethod
     def _word2vec(author_poetry_dict):
-        """用word2vector解析每个作者的词向量"""
+        """用word2vector解析每个作者的词汇向量"""
         dimension = 600
         authors = list(author_poetry_dict.keys())
         poetry = list(author_poetry_dict.values())
         with open("cut_poetry", 'w') as f:
             f.write("\n".join(poetry))
-        model = Word2Vec(LineSentence("cut_poetry"), size=dimension, min_count=15,
+        model = Word2Vec(LineSentence("cut_poetry"), vector_size=dimension, min_count=15,
                          workers=multiprocessing.cpu_count())
         word_vector = []
         for i, author in enumerate(authors):
@@ -69,9 +60,9 @@ class Analyzer(object):
             for word in words:
                 word = word.strip()
                 try:
-                    vec += model[word]
+                    vec += model.wv[word]
                     count += 1
-                except KeyError:  # 有的词语不满足min_count则不会被记录在词表中
+                except KeyError:  # 有的词汇不满足min_count则不会被记录在词表中
                     pass
             word_vector.append(np.array([v / count for v in vec]))
         os.remove("cut_poetry")
@@ -83,14 +74,14 @@ class Analyzer(object):
         word_vector_tsne = t_sne.fit_transform(word_vector)
         return word_vector_tsne
 
-    def find_similar_poet(self, poet_name, use_w2v=False):
+    def find_similar_poet(self, poet, use_w2v=False):
         """
-        通过词向量寻找最相似的诗人
-        :param: poet: 需要寻找的诗人名称
-        :return:最匹配的诗人
+        通过词向量寻找最相似的词人
+        :param: poet: 需要寻找的词人名称
+        :return:最匹配的词人
         """
         word_vector = self.tfidf_word_vector if not use_w2v else self.w2v_word_vector
-        poet_index = self.authors.index(poet_name)
+        poet_index = self.authors.index(poet)
         x = word_vector[poet_index]
         min_angle = np.pi
         min_index = 0
@@ -106,7 +97,7 @@ class Analyzer(object):
         return self.authors[min_index]
 
     def find_similar_word(self, word):
-        return self.w2v_model.most_similar(word)
+        return self.w2v_model.wv.most_similar(word)
 
 
 def plot_vectors(X, target):
@@ -117,7 +108,8 @@ def plot_vectors(X, target):
     plt.figure()
     for i in range(X.shape[0]):
         plt.text(X[i, 0], X[i, 1], target[i],
-                 # color=plt.cm.Set1(y[i] / 10.),
-                 fontdict={'weight': 'bold', 'size': 4}
+                 fontdict={'weight': 'bold', 'size': 4},
+                 fontproperties = 'SimHei',
+                 fontsize = 20
                  )
     plt.show()

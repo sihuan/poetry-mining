@@ -3,3 +3,7 @@
 *.pyc
 
 out/
+
+__pycache__
+
+env

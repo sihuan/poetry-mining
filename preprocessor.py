@@ -1,5 +1,6 @@
 import os
 import pickle
+import json
 
 from collections import Counter, OrderedDict
 from jieba import posseg as pseg
@@ -9,16 +10,18 @@ class CutResult(object):
     """
     分词结果
     char_counter：字频统计
+    rhythmic_counter 词牌名计数
     author_counter：作者计数
     word_set：词汇表
     word_counter：词汇计数
     word_property_counter_dict：词汇词性
-    author_poetry_dict：解析后的结果，作者与他对应的诗
+    author_poetry_dict：解析后的结果，作者与他对应的词
     """
 
     def __init__(self):
         self.char_counter = Counter()
         self.author_counter = Counter()
+        self.rhythmic_counter = Counter()
         self.word_set = set()
         self.word_counter = Counter()
         self.word_property_counter_dict = {}
@@ -38,11 +41,11 @@ def _is_chinese(c):
     return '\u4e00' <= c <= '\u9fff'
 
 
-def cut_poetry(filename, saved_dir):
+def cut_poetry(path, saved_dir):
     """
-    对全唐诗分词
-    :param: filename: 全唐诗输入文件位置
-            saved_location: 结果存储位置
+    对全宋词分词
+    :param: path: 全宋词 json 文件所在文件夹
+            saved_dir: 结果存储位置
     :return:分词结果
     """
     target_file_path = os.path.join(saved_dir, 'cut_result.pkl')
@@ -55,32 +58,18 @@ def cut_poetry(filename, saved_dir):
     else:
         print('begin cutting poetry...')
         result = CutResult()
-        line_count = 0
-        current_author = None
-        divided_lines = []
-        with open(filename, 'r', encoding='utf-8') as f:
-            for line in f:
-                line_count += 1
-                if line_count % 5000 == 0:
-                    print('%d lines processed.' % line_count)
-                # if line_count > 10000:
-                #     break
-                try:
-                    if line.strip() == "":
-                        continue
-                    # 解析作者
-                    if "【" in line:
-                        header = line.split()[1]
-                        author = header[header.find("】") + 1:].strip()
-                        result.author_counter[author] += 1
-                        divided_lines.append("\n")
-                        # 将当前分词后的结果加入结果表中
-                        if current_author is not None:
-                            result.add_cut_poetry(current_author, divided_lines)
-                            divided_lines = []
-                        current_author = author
-                        continue
-                    # 解析诗句
+        files= os.listdir(path)
+        for file in files:
+            load_dict = []
+            with open(f'{path}/{file}','r') as load_f:
+                load_dict = json.load(load_f)
+            for song in load_dict:
+                author = song['author']
+                result.author_counter[author] += 1
+                rhythmic = song['rhythmic']
+                result.rhythmic_counter[rhythmic] += 1
+                for line in song['paragraphs']:
+                    divided_lines = []
                     chars = [c for c in line if _is_chinese(c)]
                     for char in chars:
                         result.char_counter[char] += 1
@@ -94,11 +83,8 @@ def cut_poetry(filename, saved_dir):
                         result.word_set.add(word)
                         result.word_counter[word] += 1
                         divided_lines.append(word)
-                except Exception as e:
-                    print("%d-解析全唐诗文件异常 %s" % (line_count, line))
-                    raise e
-        # 加入最后一次解析的结果
-        result.add_cut_poetry(current_author, divided_lines)
+                    divided_lines.append("\n")
+                    result.add_cut_poetry(author, divided_lines)
         with open(target_file_path, 'wb') as f:
             pickle.dump(result, f)
     return result
